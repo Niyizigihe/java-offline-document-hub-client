@@ -1,0 +1,15 @@
+.table-row-cell:filled:even {
+    -fx-background-color: #f9f9f9;
+}
+
+.table-row-cell:filled:odd {
+    -fx-background-color: #ffffff;
+}
+
+.table-row-cell:hover {
+    -fx-background-color: #dcdde1;
+}
+
+.button {
+    -fx-cursor: hand;
+}

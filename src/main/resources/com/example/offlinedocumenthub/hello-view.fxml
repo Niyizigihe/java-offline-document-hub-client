@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.example.offlinedocumenthub.HelloController"
+      spacing="15" style="-fx-background-color: #f4f6f8; -fx-padding: 30;"
+      alignment="CENTER">
+
+    <!-- Header -->
+    <Label text="Offline Document Hub" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+    <Label text="Client Application" style="-fx-font-size: 16px; -fx-text-fill: #7f8c8d;"/>
+
+    <!-- Server Status Section -->
+    <VBox spacing="10" style="-fx-background-color: white; -fx-padding: 15; -fx-border-color: #bdc3c7; -fx-border-radius: 5;">
+        <Label text="Server Connection" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+        <Label fx:id="serverStatusLabel" text="Not connected" style="-fx-font-size: 14px;"/>
+        <HBox spacing="10">
+            <Button text="Change Server" onAction="#onChangeServer"
+                    style="-fx-background-color: #3498db; -fx-text-fill: white;"/>
+            <Button text="Test Connection" onAction="#onTestConnection"
+                    style="-fx-background-color: #2ecc71; -fx-text-fill: white;"/>
+        </HBox>
+    </VBox>
+
+    <!-- Login Form -->
+    <VBox spacing="15" style="-fx-background-color: white; -fx-padding: 25; -fx-border-color: #bdc3c7; -fx-border-radius: 5;"
+          prefWidth="400">
+        <Label text="Login to Your Account" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+
+        <TextField fx:id="usernameField" promptText="Username"
+                   style="-fx-pref-height: 40px; -fx-font-size: 14px;"/>
+        <PasswordField fx:id="passwordField" promptText="Password"
+                       style="-fx-pref-height: 40px; -fx-font-size: 14px;"/>
+
+        <Label fx:id="msgLabel" style="-fx-text-fill: #e74c3c; -fx-wrap-text: true;"/>
+
+        <Button text="Login" onAction="#onLogin"
+                style="-fx-background-color: #1abc9c; -fx-text-fill: white; -fx-font-size: 16px; -fx-pref-height: 45px; -fx-pref-width: 100%;"/>
+
+        <HBox spacing="5" alignment="CENTER">
+            <Label text="Don't have an account?"/>
+            <Hyperlink text="Register here" onAction="#onRegisterLinkClick"/>
+        </HBox>
+    </VBox>
+
+    <!-- Footer -->
+    <HBox spacing="20" alignment="CENTER">
+        <Button text="Exit" onAction="#onExit"
+                style="-fx-background-color: #95a5a6; -fx-text-fill: white;"/>
+    </HBox>
+</VBox>

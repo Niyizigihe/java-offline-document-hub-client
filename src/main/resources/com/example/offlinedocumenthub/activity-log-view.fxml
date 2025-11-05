@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.example.offlinedocumenthub.ActivityLogController"
+      spacing="15" style="-fx-background-color: #f8f9fa; -fx-padding: 20;">
+
+    <!-- Header -->
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Activity Logs" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Back to Dashboard" onAction="#onBackToDashboard"
+                style="-fx-background-color: #7f8c8d; -fx-text-fill: white; -fx-font-weight: bold;"/>
+    </HBox>
+
+    <!-- Filters Section -->
+    <VBox spacing="10" style="-fx-background-color: white; -fx-padding: 15; -fx-border-color: #ddd; -fx-border-radius: 5;">
+        <Label text="Filter Logs" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+
+        <GridPane hgap="10" vgap="10">
+            <columnConstraints>
+                <ColumnConstraints halignment="RIGHT" minWidth="100"/>
+                <ColumnConstraints halignment="LEFT" minWidth="150"/>
+                <ColumnConstraints halignment="RIGHT" minWidth="100"/>
+                <ColumnConstraints halignment="LEFT" minWidth="150"/>
+                <ColumnConstraints halignment="RIGHT" minWidth="100"/>
+                <ColumnConstraints halignment="LEFT" minWidth="150"/>
+            </columnConstraints>
+
+            <rowConstraints>
+                <RowConstraints minHeight="35"/>
+            </rowConstraints>
+
+            <!-- Filter Row -->
+            <Label text="Date:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+            <DatePicker fx:id="filterDate" promptText="Select date" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+            <Label text="User:" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+            <ComboBox fx:id="filterUser" promptText="Select user" prefWidth="150" GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+
+            <Label text="Action:" GridPane.columnIndex="4" GridPane.rowIndex="0"/>
+            <ComboBox fx:id="filterAction" promptText="Select action" prefWidth="150" GridPane.columnIndex="5" GridPane.rowIndex="0"/>
+        </GridPane>
+
+        <!-- Filter Buttons -->
+        <HBox spacing="10" alignment="CENTER_RIGHT">
+            <Button text="Clear Filters" onAction="#clearFilters"
+                    style="-fx-background-color: #95a5a6; -fx-text-fill: white;"/>
+            <Button text="Apply Filters" onAction="#applyFilters"
+                    style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        </HBox>
+    </VBox>
+
+    <!-- Statistics and Controls -->
+    <HBox spacing="15" alignment="CENTER_LEFT">
+        <Label fx:id="lblTotalLogs" text="Total Logs: 0"
+               style="-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #27ae60;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Export Logs" onAction="#exportLogs"
+                style="-fx-background-color: #9b59b6; -fx-text-fill: white;"/>
+        <Button text="Refresh" onAction="#refreshLogs"
+                style="-fx-background-color: #1abc9c; -fx-text-fill: white; -fx-font-weight: bold;"/>
+    </HBox>
+
+    <!-- Logs Table -->
+    <TableView fx:id="logTable" prefHeight="400" style="-fx-background-color: white; -fx-border-color: #ddd;">
+        <columns>
+            <!-- User Column -->
+            <TableColumn fx:id="colUser" text="User" prefWidth="200">
+                <graphic>
+                    <HBox spacing="5" alignment="CENTER_LEFT">
+                        <Label text="User" style="-fx-font-weight: bold;"/>
+                    </HBox>
+                </graphic>
+            </TableColumn>
+
+            <!-- Action Column -->
+            <TableColumn fx:id="colAction" text="Action" prefWidth="150">
+                <graphic>
+                    <HBox spacing="5" alignment="CENTER_LEFT">
+                        <Label text="Action" style="-fx-font-weight: bold;"/>
+                    </HBox>
+                </graphic>
+            </TableColumn>
+
+            <!-- Details Column -->
+            <TableColumn fx:id="colDetails" text="Details" prefWidth="300">
+                <graphic>
+                    <HBox spacing="5" alignment="CENTER_LEFT">
+                        <Label text="Details" style="-fx-font-weight: bold;"/>
+                    </HBox>
+                </graphic>
+            </TableColumn>
+
+            <!-- Timestamp Column -->
+            <TableColumn fx:id="colTimestamp" text="Timestamp" prefWidth="180">
+                <graphic>
+                    <HBox spacing="5" alignment="CENTER_LEFT">
+                        <Label text="Timestamp" style="-fx-font-weight: bold;"/>
+                    </HBox>
+                </graphic>
+            </TableColumn>
+        </columns>
+
+        <!-- Placeholder for empty table -->
+        <placeholder>
+            <VBox alignment="CENTER" spacing="10" style="-fx-padding: 30;">
+                <Label text="No activity logs found" style="-fx-font-size: 16px; -fx-text-fill: #7f8c8d;"/>
+                <Label text="Activity logs will appear here when users perform actions in the system."
+                       style="-fx-text-fill: #95a5a6; -fx-wrap-text: true; -fx-alignment: CENTER;"/>
+            </VBox>
+        </placeholder>
+    </TableView>
+
+    <!-- Footer Information -->
+    <HBox spacing="10" alignment="CENTER">
+        <Label text="💡 Tip: Use filters to find specific activities. Activity logs are automatically recorded for all user actions."
+               style="-fx-text-fill: #7f8c8d; -fx-font-style: italic; -fx-wrap-text: true; -fx-alignment: CENTER;"/>
+    </HBox>
+
+</VBox>

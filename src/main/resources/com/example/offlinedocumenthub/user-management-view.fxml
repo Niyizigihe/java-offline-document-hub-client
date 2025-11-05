@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<?import java.lang.String?>
+<VBox xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.offlinedocumenthub.UserManagementController"
+      spacing="10" style="-fx-background-color: #ecf0f1; -fx-padding: 20;">
+
+    <HBox spacing="10">
+        <Label text="Users" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <TextField fx:id="searchField" promptText="Search by username..." />
+        <Button text="Add User" onAction="#addUser" style="-fx-background-color: #1abc9c; -fx-text-fill: white;"/>
+    </HBox>
+
+    <TableView fx:id="userTable" style="-fx-background-color: white; -fx-table-cell-border-color: transparent; -fx-table-header-border-color: transparent;">
+        <columns>
+            <TableColumn fx:id="colId" text="ID" prefWidth="50"/>
+            <TableColumn fx:id="colUsername" text="Username" prefWidth="150"/>
+            <TableColumn fx:id="colFullName" text="Full Name" prefWidth="200"/>
+            <TableColumn fx:id="colRole" text="Role" prefWidth="100"/>
+            <TableColumn fx:id="colActions" text="Actions" prefWidth="150"/>
+        </columns>
+        <stylesheets>
+            <String fx:value="@table-style.css"/>
+        </stylesheets>
+
+    </TableView>
+</VBox>

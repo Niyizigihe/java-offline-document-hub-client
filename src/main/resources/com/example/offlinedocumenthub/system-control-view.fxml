@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.offlinedocumenthub.SystemControlController"
+      spacing="20" style="-fx-background-color: #ecf0f1; -fx-padding: 20;">
+    <Label text="System &amp; Cloud Control" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+    <HBox spacing="10">
+        <Label text="Server IP:"/>
+        <Label fx:id="lblIp" style="-fx-font-weight: bold;"/>
+    </HBox>
+    <HBox spacing="10">
+        <Label text="Port:"/>
+        <Label fx:id="lblPort" style="-fx-font-weight: bold;"/>
+    </HBox>
+    <Button text="Trigger Cloud Backup" onAction="#triggerBackup" style="-fx-background-color: #f39c12; -fx-text-fill: white; -fx-font-weight: bold;"/>
+</VBox>
