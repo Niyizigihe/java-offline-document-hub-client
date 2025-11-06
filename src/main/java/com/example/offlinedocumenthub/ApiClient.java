@@ -888,4 +888,139 @@ public class ApiClient {
         result.put("progress", 0);
         return result;
     }
+
+    // Message methods
+// Message methods - UPDATED with proper error handling
+    public static List<Message> getConversations() {
+        try {
+            HttpRequest request = addAuthHeader(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/messages/conversations"))
+                    .GET())
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("Conversations response: " + response.statusCode());
+            System.out.println("Conversations body: " + response.body());
+
+            if (response.statusCode() == 200) {
+                // Check if response is an error object or actual data
+                String responseBody = response.body();
+                if (responseBody.startsWith("{")) {
+                    // It's a JSON object, check if it's an error
+                    Map<String, Object> result = objectMapper.readValue(responseBody, new TypeReference<Map<String, Object>>() {});
+                    if (result.containsKey("success") && !(Boolean) result.get("success")) {
+                        System.err.println("Server error: " + result.get("message"));
+                        return List.of();
+                    }
+                }
+                // It's an array, parse as list of messages
+                return objectMapper.readValue(responseBody, new TypeReference<List<Message>>() {});
+            } else if (response.statusCode() == 401) {
+                authToken = null;
+                showAuthError();
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR getting conversations: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return List.of();
+    }
+
+    public static List<Message> getMessages(int otherUserId) {
+        try {
+            HttpRequest request = addAuthHeader(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/messages/" + otherUserId))
+                    .GET())
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            System.out.println("=== MESSAGES DEBUG ===");
+            System.out.println("URL: " + baseUrl + "/messages/" + otherUserId);
+            System.out.println("Status: " + response.statusCode());
+            System.out.println("Response: " + response.body());
+            System.out.println("=== END DEBUG ===");
+
+            if (response.statusCode() == 200) {
+                String responseBody = response.body().trim();
+
+                // Handle empty response
+                if (responseBody.isEmpty()) {
+                    return List.of();
+                }
+
+                // Check if it's an error response
+                if (responseBody.startsWith("{")) {
+                    try {
+                        Map<String, Object> result = objectMapper.readValue(responseBody, new TypeReference<Map<String, Object>>() {});
+                        if (result.containsKey("success") && !(Boolean) result.get("success")) {
+                            System.err.println("Server returned error: " + result.get("message"));
+                            return List.of();
+                        }
+                        // If it has success=true but is an object, try to extract data array
+                        if (result.containsKey("data") && result.get("data") instanceof List) {
+                            return objectMapper.convertValue(result.get("data"), new TypeReference<List<Message>>() {});
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Failed to parse error response: " + e.getMessage());
+                        return List.of();
+                    }
+                }
+
+                // Try to parse as array
+                return objectMapper.readValue(responseBody, new TypeReference<List<Message>>() {});
+            } else if (response.statusCode() == 401) {
+                authToken = null;
+                showAuthError();
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR getting messages: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return List.of();
+    }
+
+    public static boolean sendMessage(int receiverId, String messageText) {
+        try {
+            Map<String, Object> messageData = new HashMap<>();
+            messageData.put("receiverId", receiverId);
+            messageData.put("messageText", messageText);
+
+            String jsonBody = objectMapper.writeValueAsString(messageData);
+
+            HttpRequest request = addAuthHeader(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/messages"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                authToken = null;
+                showAuthError();
+            }
+
+            return response.statusCode() == 200;
+        } catch (Exception e) {
+            System.err.println("ERROR sending message: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static void markMessagesAsRead(int otherUserId) {
+        try {
+            HttpRequest request = addAuthHeader(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/messages/" + otherUserId + "/read"))
+                    .POST(HttpRequest.BodyPublishers.noBody()))
+                    .build();
+
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            System.err.println("ERROR marking messages as read: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
 }

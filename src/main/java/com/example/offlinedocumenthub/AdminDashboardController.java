@@ -142,13 +142,18 @@
 
 package com.example.offlinedocumenthub;
 
+import com.example.offlinedocumenthub.dto.Message;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 //import javafx.scene.control.Text;
+import javafx.scene.layout.Priority;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -156,12 +161,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.stage.FileChooser;
+import javafx.util.Duration;
 
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class AdminDashboardController {
 
@@ -190,12 +198,32 @@ public class AdminDashboardController {
     @FXML private Label lblDatabaseStatus;
     @FXML private Label lblLastLogin;
 
+    private MessagePollingService messagePollingService;
+    private VBox messagesPane;
+    private VBox conversationsPane;
+    private VBox chatPane;
+    private TextField messageInput;
+    private ScrollPane chatScrollPane;
+    private VBox chatMessagesContainer;
+    private int currentChatUserId = -1;
+
     @FXML
     public void initialize() {
         setupRoleBasedAccess();
         loadDashboardData();
         showWelcomePane();
+        lblWelcome.setText("Welcome, " + SessionManager.getCurrentFullName() + " (" + SessionManager.getCurrentRole() + ")");
+        lblUserWelcome.setText("Hello " + SessionManager.getCurrentFullName() + "! Welcome to your dashboard.");
+        initializeMessaging();
+        // Stop polling when controller is destroyed
+        contentPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null && messagePollingService != null) {
+                messagePollingService.cancel();
+            }
+        });
+        refreshDashboard();
     }
+
 
     private void setupRoleBasedAccess() {
         if (SessionManager.isLoggedIn()) {
@@ -253,6 +281,396 @@ public class AdminDashboardController {
         activityCard.setVisible(activity);
         activityCard.setManaged(activity);
     }
+
+    // Add this method to initialize messaging
+    private void initializeMessaging() {
+        try {
+            messagePollingService = new MessagePollingService();
+            messagePollingService.setPeriod(Duration.seconds(2));
+            messagePollingService.setOnNewConversations(this::updateConversations);
+            messagePollingService.setOnNewMessages(this::updateChatMessages);
+        } catch (Exception e) {
+            System.err.println("Error initializing messaging: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    // Add the showMessages method
+    @FXML
+    private void showMessages() {
+        try {
+            // Ensure messaging is initialized
+            if (messagePollingService == null) {
+                initializeMessaging();
+            }
+
+            if (messagesPane == null) {
+                createMessagesUI();
+            }
+            contentPane.getChildren().clear();
+            contentPane.getChildren().add(messagesPane);
+
+            // Start polling for conversations
+            messagePollingService.setCurrentChatUserId(-1);
+            messagePollingService.restart();
+            loadConversations();
+        } catch (Exception e) {
+            System.err.println("Error showing messages: " + e.getMessage());
+            e.printStackTrace();
+            showAlert("Error", "Failed to load messages: " + e.getMessage());
+        }
+    }
+
+    private void createMessagesUI() {
+        messagesPane = new VBox(10);
+        messagesPane.setStyle("-fx-padding: 15; -fx-background-color: white;");
+        messagesPane.setPrefSize(800, 600);
+
+        // Header
+        Label headerLabel = new Label("💬 Messages");
+        headerLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        // Start New Conversation Button
+        Button newConversationBtn = new Button("➕ Start New Conversation");
+        newConversationBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold;");
+        newConversationBtn.setOnAction(e -> showUserSelectionDialog());
+
+        // Main content split pane
+        SplitPane splitPane = new SplitPane();
+        splitPane.setPrefSize(780, 520);
+
+        // Conversations panel (left)
+        conversationsPane = new VBox(10);
+        conversationsPane.setPrefWidth(300);
+        conversationsPane.setStyle("-fx-padding: 10;");
+
+        Label conversationsLabel = new Label("Conversations");
+        conversationsLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+
+        ScrollPane conversationsScroll = new ScrollPane();
+        conversationsScroll.setFitToWidth(true);
+        conversationsScroll.setStyle("-fx-background: transparent; -fx-border-color: #ddd;");
+
+        VBox conversationsList = new VBox(5);
+        conversationsScroll.setContent(conversationsList);
+
+        conversationsPane.getChildren().addAll(conversationsLabel, conversationsScroll);
+
+        // Chat panel (right)
+        chatPane = new VBox(10);
+        chatPane.setStyle("-fx-padding: 10;");
+
+        // Chat header (will be set when a conversation is selected)
+        HBox chatHeader = new HBox();
+        chatHeader.setStyle("-fx-border-color: #ddd; -fx-border-width: 0 0 1 0; -fx-padding: 0 0 10 0;");
+
+        // Chat messages area
+        chatScrollPane = new ScrollPane();
+        chatScrollPane.setFitToWidth(true);
+        chatScrollPane.setStyle("-fx-background: transparent;");
+        chatScrollPane.setVvalue(1.0);
+
+        chatMessagesContainer = new VBox(10);
+        chatMessagesContainer.setStyle("-fx-padding: 10;");
+        chatScrollPane.setContent(chatMessagesContainer);
+
+        // Message input area
+        HBox inputArea = new HBox(10);
+        messageInput = new TextField();
+        messageInput.setPromptText("Type a message...");
+        messageInput.setPrefWidth(400);
+
+        Button sendButton = new Button("Send");
+        sendButton.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold;");
+        sendButton.setOnAction(e -> sendMessage());
+
+        messageInput.setOnAction(e -> sendMessage());
+
+        inputArea.getChildren().addAll(messageInput, sendButton);
+
+        chatPane.getChildren().addAll(chatHeader, chatScrollPane, inputArea);
+
+        splitPane.getItems().addAll(conversationsPane, chatPane);
+        messagesPane.getChildren().addAll(headerLabel, newConversationBtn, splitPane);
+    }
+
+    private void showUserSelectionDialog() {
+        try {
+            // Get all users from the server
+            List<User> allUsers = ApiClient.getUsers();
+
+            // Filter out current user
+            List<User> otherUsers = allUsers.stream()
+                    .filter(user -> user.getId() != SessionManager.getCurrentUserId())
+                    .collect(Collectors.toList());
+
+            if (otherUsers.isEmpty()) {
+                showAlert("No Users", "No other users found to start a conversation with.");
+                return;
+            }
+
+            // Create dialog
+            Dialog<User> dialog = new Dialog<>();
+            dialog.setTitle("Start New Conversation");
+            dialog.setHeaderText("Select a user to start chatting with:");
+
+            // Set the button types
+            ButtonType startChatButtonType = new ButtonType("Start Chat", ButtonBar.ButtonData.OK_DONE);
+            dialog.getDialogPane().getButtonTypes().addAll(startChatButtonType, ButtonType.CANCEL);
+
+            // Create the user list
+            ListView<User> userListView = new ListView<>();
+            userListView.setCellFactory(lv -> new ListCell<User>() {
+                @Override
+                protected void updateItem(User user, boolean empty) {
+                    super.updateItem(user, empty);
+                    if (empty || user == null) {
+                        setText(null);
+                    } else {
+                        String displayText = user.getFullName() != null && !user.getFullName().isEmpty()
+                                ? user.getFullName() + " (" + user.getUsername() + ")"
+                                : user.getUsername();
+                        setText(displayText);
+                    }
+                }
+            });
+
+            userListView.getItems().addAll(otherUsers);
+            userListView.setPrefSize(300, 200);
+
+            VBox content = new VBox(10);
+            content.setStyle("-fx-padding: 10;");
+            content.getChildren().addAll(new Label("Available Users:"), userListView);
+            dialog.getDialogPane().setContent(content);
+
+            // Enable/disable start button based on selection
+            Node startButton = dialog.getDialogPane().lookupButton(startChatButtonType);
+            startButton.setDisable(true);
+
+            userListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+                startButton.setDisable(newVal == null);
+            });
+
+            // Convert result to User when start button is clicked
+            dialog.setResultConverter(dialogButton -> {
+                if (dialogButton == startChatButtonType) {
+                    return userListView.getSelectionModel().getSelectedItem();
+                }
+                return null;
+            });
+
+            Optional<User> result = dialog.showAndWait();
+            result.ifPresent(this::startNewConversation);
+
+        } catch (Exception e) {
+            System.err.println("Error showing user selection: " + e.getMessage());
+            e.printStackTrace();
+            showAlert("Error", "Failed to load users: " + e.getMessage());
+        }
+    }
+
+    private void startNewConversation(User selectedUser) {
+        if (selectedUser != null) {
+            // Open chat with the selected user
+            openChat(selectedUser.getId(),
+                    selectedUser.getFullName() != null && !selectedUser.getFullName().isEmpty()
+                            ? selectedUser.getFullName()
+                            : selectedUser.getUsername());
+
+            // Show welcome message in the chat
+            showWelcomeMessage(selectedUser);
+        }
+    }
+
+    private void showWelcomeMessage(User selectedUser) {
+        String welcomeMessage = "You started a conversation with " +
+                (selectedUser.getFullName() != null && !selectedUser.getFullName().isEmpty()
+                        ? selectedUser.getFullName()
+                        : selectedUser.getUsername());
+
+        HBox welcomeBubble = createSystemMessageBubble(welcomeMessage);
+        chatMessagesContainer.getChildren().add(welcomeBubble);
+
+        // Scroll to bottom
+        Platform.runLater(() -> {
+            chatScrollPane.setVvalue(1.0);
+        });
+    }
+    private void showAlert(String title, String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        });
+    }
+    private HBox createSystemMessageBubble(String message) {
+        HBox messageContainer = new HBox();
+        messageContainer.setAlignment(Pos.CENTER);
+        messageContainer.setMaxWidth(400);
+
+        Label systemLabel = new Label(message);
+        systemLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px; -fx-font-style: italic;");
+        systemLabel.setPadding(new Insets(5, 10, 5, 10));
+
+        messageContainer.getChildren().add(systemLabel);
+        return messageContainer;
+    }
+    private void loadConversations() {
+        List<Message> conversations = ApiClient.getConversations();
+        updateConversations(conversations);
+    }
+
+    private void updateConversations(List<Message> conversations) {
+        VBox conversationsList = (VBox) ((ScrollPane) conversationsPane.getChildren().get(1)).getContent();
+        conversationsList.getChildren().clear();
+
+        for (Message conversation : conversations) {
+            int otherUserId = (conversation.getSenderId() == SessionManager.getCurrentUserId())
+                    ? conversation.getReceiverId()
+                    : conversation.getSenderId();
+
+            String otherUserName = (conversation.getSenderId() == SessionManager.getCurrentUserId())
+                    ? conversation.getReceiverName()
+                    : conversation.getSenderName();
+
+            HBox conversationItem = createConversationItem(otherUserId, otherUserName,
+                    conversation.getMessageText(), conversation.getSentDate(), !conversation.isRead());
+
+            conversationsList.getChildren().add(conversationItem);
+        }
+    }
+
+    private HBox createConversationItem(int userId, String userName, String lastMessage,
+                                        LocalDateTime timestamp, boolean hasUnread) {
+        HBox item = new HBox(10);
+        item.setStyle("-fx-padding: 10; -fx-background-color: " + (hasUnread ? "#ecf0f1" : "white") +
+                "; -fx-border-color: #ddd; -fx-border-width: 0 0 1 0;");
+        item.setPrefWidth(280);
+
+        item.setOnMouseClicked(e -> openChat(userId, userName));
+
+        Circle avatar = new Circle(20);
+        avatar.setFill(Color.LIGHTBLUE);
+
+        VBox textContainer = new VBox(2);
+        Label nameLabel = new Label(userName);
+        nameLabel.setStyle("-fx-font-weight: " + (hasUnread ? "bold" : "normal") + ";");
+
+        Label messageLabel = new Label(lastMessage.length() > 30 ? lastMessage.substring(0, 30) + "..." : lastMessage);
+        messageLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+
+        textContainer.getChildren().addAll(nameLabel, messageLabel);
+
+        VBox timeContainer = new VBox();
+        Label timeLabel = new Label(formatTime(timestamp));
+        timeLabel.setStyle("-fx-text-fill: #95a5a6; -fx-font-size: 10px;");
+        timeContainer.getChildren().add(timeLabel);
+
+        HBox.setHgrow(textContainer, Priority.ALWAYS);
+        item.getChildren().addAll(avatar, textContainer, timeContainer);
+
+        return item;
+    }
+
+    private void openChat(int userId, String userName) {
+        currentChatUserId = userId;
+
+        // Update chat header
+        HBox chatHeader = (HBox) chatPane.getChildren().get(0);
+        chatHeader.getChildren().clear();
+        Label chatTitle = new Label("Chat with " + userName);
+        chatTitle.setStyle("-fx-font-weight: bold; -fx-font-size: 16px;");
+        chatHeader.getChildren().add(chatTitle);
+
+        // Clear previous messages
+        chatMessagesContainer.getChildren().clear();
+
+        // Load messages
+        loadChatMessages();
+
+        // Mark messages as read
+        ApiClient.markMessagesAsRead(userId);
+
+        // Switch polling to current chat
+        messagePollingService.setCurrentChatUserId(userId);
+    }
+
+    private void loadChatMessages() {
+        List<Message> messages = ApiClient.getMessages(currentChatUserId);
+        updateChatMessages(messages);
+    }
+
+    private void updateChatMessages(List<Message> messages) {
+        chatMessagesContainer.getChildren().clear();
+
+        for (Message message : messages) {
+            HBox messageBubble = createMessageBubble(message);
+            chatMessagesContainer.getChildren().add(messageBubble);
+        }
+
+        // Scroll to bottom
+        Platform.runLater(() -> {
+            chatScrollPane.setVvalue(1.0);
+        });
+    }
+
+    private HBox createMessageBubble(Message message) {
+        HBox messageContainer = new HBox();
+        messageContainer.setMaxWidth(400);
+
+        VBox bubble = new VBox(5);
+        bubble.setStyle("-fx-background-color: " +
+                (message.getSenderId() == SessionManager.getCurrentUserId() ? "#3498db" : "#ecf0f1") +
+                "; -fx-background-radius: 15; -fx-padding: 10;");
+        bubble.setMaxWidth(350);
+
+        Label messageText = new Label(message.getMessageText());
+        messageText.setStyle("-fx-text-fill: " +
+                (message.getSenderId() == SessionManager.getCurrentUserId() ? "white" : "black") +
+                "; -fx-wrap-text: true;");
+        messageText.setMaxWidth(330);
+
+        Label timeLabel = new Label(formatTime(message.getSentDate()));
+        timeLabel.setStyle("-fx-text-fill: " +
+                (message.getSenderId() == SessionManager.getCurrentUserId() ? "rgba(255,255,255,0.7)" : "#7f8c8d") +
+                "; -fx-font-size: 10px;");
+
+        bubble.getChildren().addAll(messageText, timeLabel);
+
+        if (message.getSenderId() == SessionManager.getCurrentUserId()) {
+            // My message - align right
+            messageContainer.setAlignment(Pos.CENTER_RIGHT);
+            HBox.setHgrow(messageContainer, Priority.ALWAYS);
+        } else {
+            // Their message - align left
+            messageContainer.setAlignment(Pos.CENTER_LEFT);
+        }
+
+        messageContainer.getChildren().add(bubble);
+        return messageContainer;
+    }
+
+    private void sendMessage() {
+        String text = messageInput.getText().trim();
+        if (!text.isEmpty() && currentChatUserId > 0) {
+            boolean success = ApiClient.sendMessage(currentChatUserId, text);
+            if (success) {
+                messageInput.clear();
+                // Message will appear in next poll
+            }
+        }
+    }
+
+    private String formatTime(LocalDateTime timestamp) {
+        if (timestamp == null) return "";
+
+        java.time.format.DateTimeFormatter formatter =
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+        return timestamp.format(formatter);
+    }
+
+
 
     private void loadDashboardData() {
         try {
@@ -320,7 +738,7 @@ public class AdminDashboardController {
     }
 
     @FXML
-    private void showSystemControl() {
+        private void showSystemControl() {
         if (!SessionManager.isAdmin()) {
             showAccessDeniedAlert();
             return;
