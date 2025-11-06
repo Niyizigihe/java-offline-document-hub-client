@@ -1,18 +1,129 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
 
-<VBox xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.offlinedocumenthub.SystemControlController"
-      spacing="20" style="-fx-background-color: #ecf0f1; -fx-padding: 20;">
-    <Label text="System &amp; Cloud Control" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
-    <HBox spacing="10">
-        <Label text="Server IP:"/>
-        <Label fx:id="lblIp" style="-fx-font-weight: bold;"/>
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.example.offlinedocumenthub.SystemController"
+      spacing="20"
+      style="-fx-background-color: #ecf0f1; -fx-padding: 20;"
+      prefWidth="800" prefHeight="600">
+
+    <!-- Header -->
+    <Label text="System &amp; Cloud Control Center"
+           style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+
+    <!-- User Info -->
+    <VBox spacing="10" style="-fx-background-color: white; -fx-padding: 15; -fx-background-radius: 8;">
+        <Label text="User Information" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+        <Label fx:id="lblUserInfo" style="-fx-text-fill: #7f8c8d; -fx-font-size: 14px;"/>
+    </VBox>
+
+    <!-- System Status Section -->
+    <VBox spacing="15" style="-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 8;">
+        <Label text="System Status" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+
+        <GridPane hgap="20" vgap="15">
+            <columnConstraints>
+                <ColumnConstraints prefWidth="150"/>
+                <ColumnConstraints prefWidth="200"/>
+                <ColumnConstraints prefWidth="150"/>
+                <ColumnConstraints prefWidth="200"/>
+            </columnConstraints>
+
+            <!-- Row 1 -->
+            <Label text="Server IP:" GridPane.columnIndex="0" GridPane.rowIndex="0"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label fx:id="lblIp" GridPane.columnIndex="1" GridPane.rowIndex="0"
+                   style="-fx-text-fill: #2c3e50;"/>
+
+            <Label text="Port:" GridPane.columnIndex="2" GridPane.rowIndex="0"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label fx:id="lblPort" GridPane.columnIndex="3" GridPane.rowIndex="0"
+                   style="-fx-text-fill: #2c3e50;"/>
+
+            <!-- Row 2 -->
+            <Label text="Server Status:" GridPane.columnIndex="0" GridPane.rowIndex="1"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label fx:id="lblServerStatus" GridPane.columnIndex="1" GridPane.rowIndex="1"
+                   style="-fx-font-weight: bold;"/>
+
+            <Label text="Database:" GridPane.columnIndex="2" GridPane.rowIndex="1"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label fx:id="lblDatabaseStatus" GridPane.columnIndex="3" GridPane.rowIndex="1"
+                   style="-fx-text-fill: #27ae60; -fx-font-weight: bold;" text="Connected"/>
+        </GridPane>
+    </VBox>
+
+    <!-- Backup & Cloud Section -->
+    <VBox spacing="15" style="-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 8;">
+        <Label text="Backup &amp; Cloud Operations" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+
+        <HBox spacing="15" alignment="CENTER_LEFT">
+            <Button text="🔄 Trigger Cloud Backup" onAction="#triggerBackup"
+                    style="-fx-background-color: #f39c12; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20;"/>
+
+            <Button text="📊 System Health Check" onAction="#onSystemHealthCheck"
+                    style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20;"/>
+
+            <Button text="🧹 Clear System Cache" onAction="#onClearCache"
+                    style="-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20;"/>
+        </HBox>
+
+        <!-- Backup Progress -->
+        <VBox fx:id="backupProgressSection" visible="false" spacing="10" style="-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5;">
+            <Label text="Backup in Progress..." style="-fx-font-weight: bold; -fx-text-fill: #f39c12;"/>
+            <ProgressBar fx:id="backupProgressBar" prefWidth="300" progress="0.0"/>
+            <Label fx:id="lblBackupStatus" text="Preparing backup..." style="-fx-text-fill: #7f8c8d; -fx-font-size: 12px;"/>
+        </VBox>
+    </VBox>
+
+    <!-- System Information -->
+    <VBox spacing="15" style="-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 8;">
+        <Label text="System Information" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+
+        <GridPane hgap="15" vgap="10">
+            <columnConstraints>
+                <ColumnConstraints prefWidth="200"/>
+                <ColumnConstraints prefWidth="300"/>
+            </columnConstraints>
+
+            <rowConstraints>
+                <RowConstraints prefHeight="30"/>
+                <RowConstraints prefHeight="30"/>
+                <RowConstraints prefHeight="30"/>
+            </rowConstraints>
+
+            <Label text="Shared Documents Folder:" GridPane.columnIndex="0" GridPane.rowIndex="0"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label fx:id="lblSharedFolder" text="./shared_documents" GridPane.columnIndex="1" GridPane.rowIndex="0"
+                   style="-fx-text-fill: #2c3e50;"/>
+
+            <Label text="Active Sessions:" GridPane.columnIndex="0" GridPane.rowIndex="1"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label fx:id="lblActiveSessions" text="1" GridPane.columnIndex="1" GridPane.rowIndex="1"
+                   style="-fx-text-fill: #2c3e50;"/>
+
+            <Button text="View Backup History" onAction="#viewBackupHistory" style="-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-weight: bold;"/>
+            <Label text="Last Backup:" GridPane.columnIndex="0" GridPane.rowIndex="2"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label fx:id="lblLastBackup" text="Never" GridPane.columnIndex="1" GridPane.rowIndex="2"
+                   style="-fx-text-fill: #2c3e50;"/>
+        </GridPane>
+    </VBox>
+
+    <!-- Action Buttons -->
+    <HBox spacing="15" alignment="CENTER_RIGHT">
+        <Button text="🔄 Refresh" onAction="#refreshSystemInfo"
+                style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15;"/>
+
+        <Button text="🚪 Logout" onAction="#onLogout"
+                style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15;"/>
+
+        <Button text="⬅ Back to Dashboard" onAction="#onBackToDashboard"
+                style="-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15;"/>
     </HBox>
-    <HBox spacing="10">
-        <Label text="Port:"/>
-        <Label fx:id="lblPort" style="-fx-font-weight: bold;"/>
-    </HBox>
-    <Button text="Trigger Cloud Backup" onAction="#triggerBackup" style="-fx-background-color: #f39c12; -fx-text-fill: white; -fx-font-weight: bold;"/>
+
 </VBox>

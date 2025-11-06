@@ -7,8 +7,11 @@ module com.example.offlinedocumenthub {
     requires java.prefs;
     requires java.net.http;
     requires com.fasterxml.jackson.datatype.jsr310;
+    requires java.desktop;
 
 
     opens com.example.offlinedocumenthub to javafx.fxml;
+    opens com.example.offlinedocumenthub.dto to com.fasterxml.jackson.databind;
     exports com.example.offlinedocumenthub;
+    exports com.example.offlinedocumenthub.dto;
 }

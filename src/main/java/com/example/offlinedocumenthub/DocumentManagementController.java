@@ -10,11 +10,16 @@ import javafx.stage.FileChooser;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.List;
+
+import static com.example.offlinedocumenthub.ApiClient.*;
+//import static javax.xml.catalog.BaseEntry.CatalogEntryType.URI;
 
 public class DocumentManagementController {
 
@@ -72,6 +77,7 @@ public class DocumentManagementController {
                 deleteBtn.setOnAction(e -> onDeleteDocument(getTableView().getItems().get(getIndex())));
             }
 
+            // Update the button visibility logic
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
@@ -79,11 +85,17 @@ public class DocumentManagementController {
                     setGraphic(null);
                 } else {
                     Document document = getTableView().getItems().get(getIndex());
-                    HBox buttons = new HBox(5, downloadBtn, editBtn);
+                    HBox buttons = new HBox(5);
 
-                    // Only show delete button for admins or document owners
-                    if (SessionManager.isAdmin() ||
-                            (SessionManager.isLoggedIn() && document.getUserId() == SessionManager.getCurrentUserId())) {
+                    // Always show download button
+                    buttons.getChildren().add(downloadBtn);
+
+                    // Show edit/delete only for admins or document owners
+                    boolean canModify = SessionManager.isAdmin() ||
+                            (SessionManager.isLoggedIn() && document.getUserId() == SessionManager.getCurrentUserId());
+
+                    if (canModify) {
+                        buttons.getChildren().add(editBtn);
                         buttons.getChildren().add(deleteBtn);
                     }
 
@@ -94,60 +106,200 @@ public class DocumentManagementController {
     }
 
     @FXML
-    public void loadDocuments() {
+    private void loadDocuments() {
         documents.clear();
-
         try {
-            // Get documents from API
+            System.out.println("=== Loading Documents ===");
             List<Document> docs = ApiClient.getDocuments();
+            System.out.println("Received " + docs.size() + " documents from API");
+
+            for (Document doc : docs) {
+                System.out.println("Doc: " + doc.getTitle() +
+                        " | Size: " + doc.getFileSize() +
+                        " | By: " + doc.getUploadedBy());
+            }
+
             documents.addAll(docs);
             documentTable.setItems(documents);
         } catch (Exception e) {
             e.printStackTrace();
-            showError("Server Error", "Failed to load documents from server: " + e.getMessage());
+            showError("Server Error", "Failed to load documents: " + e.getMessage());
         }
     }
 
-    private void onDownloadDocument(Document doc) {
+//    private void onDownloadDocument(Document doc) {
+//        try {
+//            // For now, we'll handle download locally
+//            // In a real implementation, you'd call an API endpoint to get the file
+//            File sourceFile = new File(doc.getFilePath());
+//
+//            if (!sourceFile.exists()) {
+//                showError("Download Failed", "File not found: " + doc.getFilePath());
+//                return;
+//            }
+//
+//            // Let user choose download location
+//            DirectoryChooser directoryChooser = new DirectoryChooser();
+//            directoryChooser.setTitle("Choose Download Location");
+//            directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+//
+//            File selectedDirectory = directoryChooser.showDialog(documentTable.getScene().getWindow());
+//
+//            if (selectedDirectory != null) {
+//                Path destinationPath = selectedDirectory.toPath().resolve(sourceFile.getName());
+//
+//                // Copy file to selected location
+//                Files.copy(sourceFile.toPath(), destinationPath, StandardCopyOption.REPLACE_EXISTING);
+//
+//                // Log the download activity
+//                logActivity("DOWNLOAD", "Downloaded document: " + doc.getTitle());
+//
+//                showInfo("Download Successful",
+//                        "File downloaded successfully to:\n" + destinationPath.toString());
+//            }
+//
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//            showError("Download Failed", "Failed to download file: " + e.getMessage());
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            showError("Download Failed", "An error occurred during download: " + e.getMessage());
+//        }
+//    }
+private void onDownloadDocument(Document doc) {
+    try {
+        System.out.println("Downloading document ID: " + doc.getDocId() + " - " + doc.getTitle());
+
+        // Show progress
+        Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
+        progressAlert.setTitle("Downloading");
+        progressAlert.setHeaderText("Please wait");
+        progressAlert.setContentText("Downloading document from server...");
+        progressAlert.show();
+
+        // Download file from server using ApiClient
+        boolean success = downloadFileFromServer(doc);
+
+        progressAlert.close();
+
+        if (success) {
+            logActivity("DOWNLOAD", "Downloaded document: " + doc.getTitle());
+            showInfo("Download Successful", "File downloaded successfully!");
+        } else {
+            showError("Download Failed", "Failed to download file from server.");
+        }
+
+    } catch (Exception e) {
+        System.err.println("ERROR during download: " + e.getMessage());
+        e.printStackTrace();
+        showError("Download Failed", "Failed to download file: " + e.getMessage());
+    }
+}
+
+//    private boolean downloadFileFromServer(Document doc) {
+//        try {
+//            // Use ApiClient to handle the download
+//            String url = ApiClient.getBaseUrl() + "/documents/" + doc.getDocId() + "/download";
+//
+//            HttpRequest request = ApiClient.addAuthHeader(HttpRequest.newBuilder()
+//                            .uri(URI.create(url))
+//                            .GET())
+//                    .build();
+//
+//            HttpResponse<byte[]> response = ApiClient.getHttpClient().send(request, HttpResponse.BodyHandlers.ofByteArray());
+//
+//            System.out.println("Download response status: " + response.statusCode());
+//
+//            if (response.statusCode() == 200) {
+//                byte[] fileData = response.body();
+//
+//                // Let user choose save location
+//                FileChooser fileChooser = new FileChooser();
+//                fileChooser.setTitle("Save Document");
+//                fileChooser.setInitialFileName(doc.getTitle() + getFileExtension(doc.getFilePath()));
+//                fileChooser.getExtensionFilters().add(
+//                        new FileChooser.ExtensionFilter("All Files", "*.*")
+//                );
+//
+//                File saveFile = fileChooser.showSaveDialog(documentTable.getScene().getWindow());
+//
+//                if (saveFile != null) {
+//                    // Save the file
+//                    Files.write(saveFile.toPath(), fileData);
+//                    System.out.println("File saved to: " + saveFile.getAbsolutePath());
+//                    return true;
+//                }
+//            } else {
+//                System.err.println("Download failed with status: " + response.statusCode());
+//                String errorBody = new String(response.body());
+//                System.err.println("Error response: " + errorBody);
+//            }
+//
+//            return false;
+//        } catch (Exception e) {
+//            System.err.println("ERROR downloading file from server: " + e.getMessage());
+//            e.printStackTrace();
+//            return false;
+//        }
+//    }
+
+    private boolean downloadFileFromServer(Document doc) {
         try {
-            // For now, we'll handle download locally
-            // In a real implementation, you'd call an API endpoint to get the file
-            File sourceFile = new File(doc.getFilePath());
+            // Use the dedicated download method from ApiClient
+            byte[] fileData = ApiClient.downloadDocument(doc.getDocId());
 
-            if (!sourceFile.exists()) {
-                showError("Download Failed", "File not found: " + doc.getFilePath());
-                return;
+            if (fileData != null && fileData.length > 0) {
+                // Let user choose save location
+                FileChooser fileChooser = new FileChooser();
+                fileChooser.setTitle("Save Document");
+
+                // Generate safe filename
+                String safeFileName = doc.getTitle().replaceAll("[^a-zA-Z0-9.-]", "_");
+                String extension = getFileExtension(doc.getFilePath());
+                fileChooser.setInitialFileName(safeFileName + extension);
+
+                fileChooser.getExtensionFilters().addAll(
+                        new FileChooser.ExtensionFilter("All Files", "*.*"),
+                        new FileChooser.ExtensionFilter("PDF Files", "*.pdf"),
+                        new FileChooser.ExtensionFilter("Word Documents", "*.doc", "*.docx"),
+                        new FileChooser.ExtensionFilter("Text Files", "*.txt")
+                );
+
+                File saveFile = fileChooser.showSaveDialog(documentTable.getScene().getWindow());
+
+                if (saveFile != null) {
+                    // Save the file
+                    Files.write(saveFile.toPath(), fileData);
+                    System.out.println("File downloaded successfully to: " + saveFile.getAbsolutePath());
+                    System.out.println("File size: " + fileData.length + " bytes");
+                    return true;
+                }
+            } else {
+                System.err.println("No file data received from server");
             }
 
-            // Let user choose download location
-            DirectoryChooser directoryChooser = new DirectoryChooser();
-            directoryChooser.setTitle("Choose Download Location");
-            directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
-
-            File selectedDirectory = directoryChooser.showDialog(documentTable.getScene().getWindow());
-
-            if (selectedDirectory != null) {
-                Path destinationPath = selectedDirectory.toPath().resolve(sourceFile.getName());
-
-                // Copy file to selected location
-                Files.copy(sourceFile.toPath(), destinationPath, StandardCopyOption.REPLACE_EXISTING);
-
-                // Log the download activity
-                logActivity("DOWNLOAD", "Downloaded document: " + doc.getTitle());
-
-                showInfo("Download Successful",
-                        "File downloaded successfully to:\n" + destinationPath.toString());
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            showError("Download Failed", "Failed to download file: " + e.getMessage());
+            return false;
         } catch (Exception e) {
+            System.err.println("ERROR downloading file from server: " + e.getMessage());
             e.printStackTrace();
-            showError("Download Failed", "An error occurred during download: " + e.getMessage());
+            return false;
         }
     }
 
+    private String getFileExtension(String filePath) {
+        if (filePath == null) return "";
+        int lastDotIndex = filePath.lastIndexOf(".");
+        return (lastDotIndex > 0) ? filePath.substring(lastDotIndex) : ".bin";
+    }
+
+    // Helper method to add auth header (add this to your ApiClient if not exists)
+    private static HttpRequest.Builder addAuthHeader(HttpRequest.Builder builder) {
+        if (ApiClient.isAuthenticated()) {
+            // You'll need to make authToken accessible or add a method in ApiClient
+            return builder.header("Authorization", "Bearer " + getAuthToken());
+        }
+        return builder;
+    }
     @FXML
     private void onAddDocument() {
         if (!SessionManager.isLoggedIn()) {
@@ -175,43 +327,102 @@ public class DocumentManagementController {
 
             dialog.showAndWait().ifPresent(title -> {
                 if (!title.trim().isEmpty()) {
+                    // Show progress
+                    Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
+                    progressAlert.setTitle("Uploading");
+                    progressAlert.setHeaderText("Please wait");
+                    progressAlert.setContentText("Uploading document...");
+                    progressAlert.show();
+
                     // Use API to upload document
-                    boolean success = ApiClient.createDocument(title.trim(), file.getName(), file);
+                    boolean success = ApiClient.createDocument(title.trim(), file.getAbsolutePath(), file);
+
+                    progressAlert.close();
+
                     if (success) {
                         showInfo("Success", "Document uploaded successfully!");
                         loadDocuments();
-                        logActivity("UPLOAD", "Uploaded document: " + title);
                     } else {
-                        showError("Upload Failed", "Failed to upload document to server");
+                        showError("Upload Failed", "Failed to upload document to server. Check server connection.");
                     }
                 }
             });
         }
     }
 
-    private void onEditDocument(Document doc) {
-        // Check permissions - only admin or document owner can edit
-        if (!SessionManager.isAdmin() &&
-                (SessionManager.isLoggedIn() && doc.getUserId() != SessionManager.getCurrentUserId())) {
-            showError("Permission Denied", "You can only edit your own documents.");
-            return;
-        }
 
-        // For now, show simple edit dialog
-        TextInputDialog dialog = new TextInputDialog(doc.getTitle());
-        dialog.setTitle("Edit Document");
-        dialog.setHeaderText("Edit Document Title");
-        dialog.setContentText("Title:");
-
-        dialog.showAndWait().ifPresent(title -> {
-            if (!title.trim().isEmpty() && !title.equals(doc.getTitle())) {
-                // Update document via API (you'll need to implement updateDocument in ApiClient)
-                showInfo("Info", "Edit functionality will be implemented in API");
-                logActivity("EDIT", "Edited document: " + doc.getTitle());
-            }
-        });
+//    private void onEditDocument(Document doc) {
+//        // Check permissions - only admin or document owner can edit
+//        if (!SessionManager.isAdmin() &&
+//                (SessionManager.isLoggedIn() && doc.getUserId() != SessionManager.getCurrentUserId())) {
+//            showError("Permission Denied", "You can only edit your own documents.");
+//            return;
+//        }
+//
+//        // For now, show simple edit dialog
+//        TextInputDialog dialog = new TextInputDialog(doc.getTitle());
+//        dialog.setTitle("Edit Document");
+//        dialog.setHeaderText("Edit Document Title");
+//        dialog.setContentText("Title:");
+//
+//        dialog.showAndWait().ifPresent(title -> {
+//            if (!title.trim().isEmpty() && !title.equals(doc.getTitle())) {
+//                // Update document via API (you'll need to implement updateDocument in ApiClient)
+//                showInfo("Info", "Edit functionality will be implemented in API");
+//                logActivity("EDIT", "Edited document: " + doc.getTitle());
+//            }
+//        });
+//    }
+private void onEditDocument(Document doc) {
+    // Check permissions - only admin or document owner can edit
+    if (!SessionManager.isAdmin() &&
+            (SessionManager.isLoggedIn() && doc.getUserId() != SessionManager.getCurrentUserId())) {
+        showError("Permission Denied", "You can only edit your own documents.");
+        return;
     }
 
+    // Show edit dialog
+    TextInputDialog dialog = new TextInputDialog(doc.getTitle());
+    dialog.setTitle("Edit Document");
+    dialog.setHeaderText("Edit Document Title");
+    dialog.setContentText("New Title:");
+
+    dialog.showAndWait().ifPresent(title -> {
+        if (!title.trim().isEmpty() && !title.equals(doc.getTitle())) {
+            // Create a copy with updated title
+            Document updatedDoc = new Document();
+            updatedDoc.setDocId(doc.getDocId());
+            updatedDoc.setTitle(title.trim());
+            updatedDoc.setFilePath(doc.getFilePath());
+            updatedDoc.setUploadedBy(doc.getUploadedBy());
+            updatedDoc.setUploadDate(doc.getUploadDate());
+            updatedDoc.setUserId(doc.getUserId());
+            updatedDoc.setFileSize(doc.getFileSize());
+
+            // Show progress
+            Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
+            progressAlert.setTitle("Updating Document");
+            progressAlert.setHeaderText("Please wait");
+            progressAlert.setContentText("Updating document title...");
+            progressAlert.show();
+
+            // Call the update API
+            boolean success = ApiClient.updateDocument(updatedDoc);
+
+            progressAlert.close();
+
+            if (success) {
+                loadDocuments();
+                logActivity("EDIT", "Edited document: " + doc.getTitle() + " to " + title);
+                showInfo("Success", "Document updated successfully.");
+            } else {
+                showError("Error", "Failed to update document. Please try again.");
+            }
+        } else if (title.trim().isEmpty()) {
+            showError("Error", "Document title cannot be empty.");
+        }
+    });
+}
     private void onDeleteDocument(Document doc) {
         // Check permissions - only admin or document owner can delete
         if (!SessionManager.isAdmin() &&
@@ -256,6 +467,44 @@ public class DocumentManagementController {
             }
         }
         documentTable.setItems(filtered);
+    }
+    @FXML
+    private void debugFilePaths() {
+        System.out.println("=== DEBUG FILE PATHS ===");
+        System.out.println("Current working directory: " + System.getProperty("user.dir"));
+
+        File sharedFolder = new File("shared_documents");
+        System.out.println("Shared folder exists: " + sharedFolder.exists());
+        System.out.println("Shared folder path: " + sharedFolder.getAbsolutePath());
+
+        if (sharedFolder.exists() && sharedFolder.isDirectory()) {
+            File[] files = sharedFolder.listFiles();
+            System.out.println("Files in shared folder: " + (files != null ? files.length : 0));
+            if (files != null) {
+                for (File file : files) {
+                    System.out.println("  - " + file.getName() + " (" + file.length() + " bytes)");
+                }
+            }
+        }
+
+        for (Document doc : documents) {
+            System.out.println("---");
+            System.out.println("Document: " + doc.getTitle());
+            System.out.println("  DB Path: " + doc.getFilePath());
+
+            File file = new File(doc.getFilePath());
+            System.out.println("  File exists: " + file.exists());
+            System.out.println("  Absolute path: " + file.getAbsolutePath());
+
+            // Try to find file by name in shared_documents
+            String fileName = new File(doc.getFilePath()).getName();
+            File sharedFile = new File("shared_documents", fileName);
+            System.out.println("  Shared folder file exists: " + sharedFile.exists());
+            System.out.println("  Shared file path: " + sharedFile.getAbsolutePath());
+        }
+        System.out.println("=== END DEBUG ===");
+
+        showInfo("Debug Info", "Check console for file path debugging information.");
     }
 
     @FXML

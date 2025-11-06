@@ -112,25 +112,25 @@ public class ActivityLogController {
         try {
             // Get logs from API
             List<ActivityLog> logs = ApiClient.getActivityLogs();
-            allLogs.addAll(logs);
+            if (logs != null && !logs.isEmpty()) {
+                allLogs.addAll(logs);
 
-            // Populate user filter
-            ObservableList<String> users = FXCollections.observableArrayList();
-            users.add("ALL");
+                // Populate user filter
+                ObservableList<String> users = FXCollections.observableArrayList();
+                users.add("ALL");
 
-            for (ActivityLog log : logs) {
-                // Add to user filter if not already present
-                String displayName = log.getUserDisplayName();
-                if (!users.contains(displayName)) {
-                    users.add(displayName);
+                for (ActivityLog log : logs) {
+                    // Add to user filter if not already present
+                    String displayName = log.getUserDisplayName();
+                    if (displayName != null && !users.contains(displayName)) {
+                        users.add(displayName);
+                    }
                 }
-            }
 
-            filterUser.setItems(users);
-            applyFilters();
-            updateLogCount();
-
-            if (logs.isEmpty()) {
+                filterUser.setItems(users);
+                applyFilters();
+                updateLogCount();
+            } else {
                 showInfo("No Logs", "No activity logs found from the server.");
             }
 

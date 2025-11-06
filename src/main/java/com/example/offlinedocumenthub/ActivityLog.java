@@ -10,6 +10,7 @@ public class ActivityLog {
     private String actionType;
     private String actionDetails;
     private LocalDateTime timestamp;
+    private String formattedTimestamp;
 
     // Default constructor for JSON deserialization
     public ActivityLog() {}
@@ -44,7 +45,18 @@ public class ActivityLog {
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
 
     // Formatted timestamp for display
+//    public String getFormattedTimestamp() {
+//        return timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+//    }
     public String getFormattedTimestamp() {
-        return timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        if (formattedTimestamp != null) {
+            return formattedTimestamp;
+        }
+        return timestamp != null ?
+                timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
+    }
+
+    public void setFormattedTimestamp(String formattedTimestamp) {
+        this.formattedTimestamp = formattedTimestamp;
     }
 }

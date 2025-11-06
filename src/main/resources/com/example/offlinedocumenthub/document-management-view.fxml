@@ -36,7 +36,7 @@
     </TableView>
 
     <HBox spacing="10" alignment="CENTER_RIGHT">
-        <Button text="Sync to Cloud" onAction="#onSyncCloud" style="-fx-background-color: #2980b9; -fx-text-fill: white;"/>
+<!--        <Button fx:id="sync" text="Sync to Cloud" onAction="#onSyncCloud" style="-fx-background-color: #2980b9; -fx-text-fill: white;"/>-->
         <Button text="Refresh" onAction="#onRefresh" style="-fx-background-color: #7f8c8d; -fx-text-fill: white;"/>
     </HBox>
 </VBox>
