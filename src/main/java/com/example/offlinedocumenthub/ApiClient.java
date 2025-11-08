@@ -360,6 +360,11 @@ public class ApiClient {
         baseUrl = "http://" + host + ":8080/api";
     }
 
+    private static void updateActivityTime() {
+        if (SessionManager.isLoggedIn()) {
+            SessionManager.updateLastActivityTime();
+        }
+    }
     // Clear auth token on logout
     public static void logout() {
         try {
@@ -436,6 +441,7 @@ public class ApiClient {
 
                     // Set session
                     SessionManager.login(userId, username, role, fullName);
+                    updateActivityTime();
                     return true;
                 }
             }
@@ -469,6 +475,7 @@ public class ApiClient {
                 showAuthError();
             }
 
+            updateActivityTime();
             return response.statusCode() == 200;
         } catch (Exception e) {
             System.err.println("ERROR updating document: " + e.getMessage());
@@ -491,6 +498,7 @@ public class ApiClient {
             System.out.println("Activity logs response: " + response.statusCode());
 
             if (response.statusCode() == 200) {
+                updateActivityTime();
                 // FIXED: Use the properly configured objectMapper
                 return objectMapper.readValue(response.body(), new TypeReference<List<ActivityLog>>() {});
             } else if (response.statusCode() == 401) {
@@ -539,6 +547,7 @@ public class ApiClient {
             System.out.println("Response body: " + response.body());
 
             if (response.statusCode() == 200) {
+                updateActivityTime();
                 // FIXED: Use the properly configured objectMapper
                 return objectMapper.readValue(response.body(), new TypeReference<List<Document>>() {});
             } else if (response.statusCode() == 401) {
@@ -606,6 +615,7 @@ public class ApiClient {
                 authToken = null;
             }
 
+            updateActivityTime();
             return response.statusCode() == 200;
         } catch (Exception e) {
             e.printStackTrace();
@@ -627,6 +637,7 @@ public class ApiClient {
             System.out.println("Download response status: " + response.statusCode());
 
             if (response.statusCode() == 200) {
+                updateActivityTime();
                 byte[] fileData = response.body();
                 System.out.println("Download successful, received " + fileData.length + " bytes");
                 return fileData;
@@ -662,6 +673,7 @@ public class ApiClient {
                 authToken = null;
             }
 
+            updateActivityTime();
             return response.statusCode() == 200;
         } catch (Exception e) {
             e.printStackTrace();
@@ -682,6 +694,7 @@ public class ApiClient {
             System.out.println("Users response: " + response.statusCode());
 
             if (response.statusCode() == 200) {
+                updateActivityTime();
                 // FIXED: Use the properly configured objectMapper
                 return objectMapper.readValue(response.body(), new TypeReference<List<User>>() {});
             } else if (response.statusCode() == 401) {
@@ -710,6 +723,7 @@ public class ApiClient {
                 authToken = null;
             }
 
+            updateActivityTime();
             return response.statusCode() == 200;
         } catch (Exception e) {
             e.printStackTrace();
@@ -733,6 +747,7 @@ public class ApiClient {
                 authToken = null;
             }
 
+            updateActivityTime();
             return response.statusCode() == 200;
         } catch (Exception e) {
             e.printStackTrace();
@@ -753,6 +768,7 @@ public class ApiClient {
                 authToken = null;
             }
 
+            updateActivityTime();
             return response.statusCode() == 200;
         } catch (Exception e) {
             e.printStackTrace();
@@ -821,6 +837,7 @@ public class ApiClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
+                updateActivityTime();
                 return objectMapper.readValue(response.body(), new TypeReference<Map<String, Object>>() {});
             } else {
                 System.err.println("Backup trigger failed with status: " + response.statusCode());
@@ -867,6 +884,7 @@ public class ApiClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
+                updateActivityTime();
                 ApiResponse<List<Map<String, String>>> apiResponse = objectMapper.readValue(
                         response.body(),
                         new TypeReference<ApiResponse<List<Map<String, String>>>>() {}
@@ -904,6 +922,7 @@ public class ApiClient {
             System.out.println("Conversations body: " + response.body());
 
             if (response.statusCode() == 200) {
+                updateActivityTime();
                 // Check if response is an error object or actual data
                 String responseBody = response.body();
                 if (responseBody.startsWith("{")) {
@@ -943,6 +962,7 @@ public class ApiClient {
             System.out.println("=== END DEBUG ===");
 
             if (response.statusCode() == 200) {
+//                updateActivityTime();
                 String responseBody = response.body().trim();
 
                 // Handle empty response
@@ -1002,6 +1022,7 @@ public class ApiClient {
                 showAuthError();
             }
 
+            updateActivityTime();
             return response.statusCode() == 200;
         } catch (Exception e) {
             System.err.println("ERROR sending message: " + e.getMessage());

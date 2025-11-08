@@ -143,14 +143,18 @@
 package com.example.offlinedocumenthub;
 
 import com.example.offlinedocumenthub.dto.Message;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.*;
 //import javafx.scene.control.Text;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Priority;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -159,6 +163,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
 import javafx.scene.Scene;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
@@ -207,11 +212,20 @@ public class AdminDashboardController {
     private VBox chatMessagesContainer;
     private int currentChatUserId = -1;
 
+    private SessionMonitorService sessionMonitorService;
+    private boolean showingSessionDialog = false;
+
+    private Alert countdownAlert;
+    private Timeline autoCloseTimeline;
+    private boolean countdownDialogOpen = false;
+
     @FXML
     public void initialize() {
         setupRoleBasedAccess();
+        initializeSessionMonitoring();
         loadDashboardData();
         showWelcomePane();
+        setupActivityTracking();
         lblWelcome.setText("Welcome, " + SessionManager.getCurrentFullName() + " (" + SessionManager.getCurrentRole() + ")");
         lblUserWelcome.setText("Hello " + SessionManager.getCurrentFullName() + "! Welcome to your dashboard.");
         initializeMessaging();
@@ -221,9 +235,250 @@ public class AdminDashboardController {
                 messagePollingService.cancel();
             }
         });
-        refreshDashboard();
+//        refreshDashboard();
     }
 
+    // Add this method to initialize session monitoring
+    private void initializeSessionMonitoring() {
+        System.out.println("=== CONTROLLER: Initializing session monitoring ===");
+
+        sessionMonitorService = new SessionMonitorService();
+        sessionMonitorService.setOnSessionExpired(this::handleSessionExpired);
+        sessionMonitorService.setOnSessionAboutToExpire(this::handleSessionAboutToExpire); // Now accepts seconds
+
+        if (SessionManager.isLoggedIn()) {
+            sessionMonitorService.start();
+            System.out.println("=== CONTROLLER: Session monitoring started ===");
+        }
+    }
+
+    // Update the session expiration handler
+
+    private void handleSessionExpired() {
+        if (countdownDialogOpen) {
+            System.out.println("=== CONTROLLER: Session expired but countdown dialog is open, letting it handle logout ===");
+            return;
+        }
+
+        System.out.println("=== CONTROLLER: Handling session expired ===");
+
+        Platform.runLater(() -> {
+            // Stop any ongoing services
+            if (messagePollingService != null) {
+                messagePollingService.cancel();
+            }
+
+            showExpirationAlert();
+        });
+    }
+
+    // Update the session warning handler
+    private void handleSessionAboutToExpire(int secondsLeft) {
+        System.out.println("=== CONTROLLER: Session warning with " + secondsLeft + " seconds left ===");
+
+        Platform.runLater(() -> {
+            // If dialog is not open, create and show it
+            if (!countdownDialogOpen) {
+                showCountdownDialog(secondsLeft);
+            } else {
+                // If dialog is already open, just update the countdown
+                updateCountdownDialog(secondsLeft);
+            }
+
+            // Auto-logout when time reaches zero
+            if (secondsLeft <= 0) {
+                System.out.println("=== CONTROLLER: Countdown reached zero, forcing logout ===");
+                forceLogout();
+            }
+        });
+    }
+
+    // New method to show the countdown dialog
+    private void showCountdownDialog(int initialSecondsLeft) {
+        if (countdownDialogOpen) return;
+
+        countdownDialogOpen = true;
+        System.out.println("=== CONTROLLER: Showing countdown dialog ===");
+
+        // Stop message polling while dialog is open
+        if (messagePollingService != null) {
+            messagePollingService.cancel();
+        }
+
+        countdownAlert = new Alert(Alert.AlertType.WARNING);
+        countdownAlert.setTitle("Session About to Expire");
+        countdownAlert.setHeaderText("Your session will expire in " + initialSecondsLeft + " seconds");
+        countdownAlert.setContentText("Would you like to extend your session?\n\nYour dashboard will automatically close when time reaches zero.");
+
+        ButtonType extendButton = new ButtonType("Extend Session");
+        ButtonType logoutButton = new ButtonType("Log Out Now");
+        countdownAlert.getButtonTypes().setAll(extendButton, logoutButton);
+
+        // Start countdown updates
+        sessionMonitorService.startCountdownUpdates();
+
+        // Set up auto-close timeline
+        setupAutoCloseTimeline(initialSecondsLeft);
+
+        // Show the dialog but don't wait for it (non-blocking)
+        countdownAlert.show();
+
+        // Handle button clicks
+        countdownAlert.getDialogPane().lookupButton(extendButton).setOnMouseClicked(e -> {
+            handleExtendSession();
+        });
+
+        countdownAlert.getDialogPane().lookupButton(logoutButton).setOnMouseClicked(e -> {
+            handleImmediateLogout();
+        });
+    }
+
+    // New method to update the countdown dialog
+    private void updateCountdownDialog(int secondsLeft) {
+        if (countdownAlert != null && countdownAlert.isShowing()) {
+            countdownAlert.setHeaderText("Your session will expire in " + secondsLeft + " seconds");
+
+            // Update auto-close timeline
+            if (autoCloseTimeline != null) {
+                autoCloseTimeline.stop();
+            }
+            setupAutoCloseTimeline(secondsLeft);
+        }
+    }
+
+    // New method to set up auto-close timeline
+    private void setupAutoCloseTimeline(int secondsLeft) {
+        if (autoCloseTimeline != null) {
+            autoCloseTimeline.stop();
+        }
+
+        autoCloseTimeline = new Timeline(
+                new KeyFrame(Duration.seconds(secondsLeft), e -> {
+                    System.out.println("=== CONTROLLER: Auto-close timeline triggered ===");
+                    forceLogout();
+                })
+        );
+        autoCloseTimeline.play();
+    }
+
+    // New method to handle extend session
+    private void handleExtendSession() {
+        System.out.println("=== CONTROLLER: User extended session ===");
+
+        // Clean up
+        cleanupCountdownDialog();
+
+        // Update activity time to extend session
+        SessionManager.updateLastActivityTime();
+
+        // Restart message polling
+        if (messagePollingService != null) {
+            messagePollingService.restart();
+        }
+    }
+
+    // New method to handle immediate logout
+    private void handleImmediateLogout() {
+        System.out.println("=== CONTROLLER: User chose immediate logout ===");
+        cleanupCountdownDialog();
+        logout();
+    }
+
+    // New method to force logout when time reaches zero
+    private void forceLogout() {
+        System.out.println("=== CONTROLLER: Force logout triggered ===");
+
+        Platform.runLater(() -> {
+            // Close the countdown dialog if it's open
+            cleanupCountdownDialog();
+
+            // Show final expiration message
+            showExpirationAlert();
+        });
+    }
+
+    // New method to show final expiration alert
+    private void showExpirationAlert() {
+        System.out.println("=== CONTROLLER: Showing expiration alert ===");
+
+        // Create and configure the expiration alert
+        Alert expirationAlert = new Alert(Alert.AlertType.INFORMATION);
+        expirationAlert.setTitle("Session Expired");
+        expirationAlert.setHeaderText("Your session has expired");
+        expirationAlert.setContentText("You have been logged out due to inactivity. Click OK to go to login page.");
+        expirationAlert.getButtonTypes().setAll(ButtonType.OK);
+
+        // Set the alert to be application modal
+        expirationAlert.initModality(Modality.APPLICATION_MODAL);
+
+        // Make sure all countdown dialogs are closed
+        cleanupCountdownDialog();
+
+        System.out.println("=== CONTROLLER: Showing expiration alert dialog ===");
+
+        // Show the alert and handle the response
+        expirationAlert.showAndWait().ifPresent(response -> {
+            System.out.println("=== CONTROLLER: User clicked OK on expiration alert ===");
+            // Navigate to login page
+            navigateToLogin();
+        });
+    }
+
+    // New method to clean up countdown dialog
+    private void cleanupCountdownDialog() {
+        System.out.println("=== CONTROLLER: Cleaning up countdown dialog ===");
+
+        countdownDialogOpen = false;
+
+        // Stop and cleanup auto-close timeline
+        if (autoCloseTimeline != null) {
+            autoCloseTimeline.stop();
+            autoCloseTimeline = null;
+        }
+
+        // Stop countdown updates
+        if (sessionMonitorService != null) {
+            sessionMonitorService.stopCountdownUpdates();
+        }
+
+        // Close the countdown alert if it's showing
+        if (countdownAlert != null) {
+            if (countdownAlert.isShowing()) {
+                countdownAlert.close();
+            }
+            countdownAlert = null;
+        }
+    }
+
+
+    // Add activity tracking for user interactions
+    private void setupActivityTracking() {
+        // Track mouse movements
+        contentPane.setOnMouseMoved(e -> SessionManager.updateLastActivityTime());
+
+        // Track key presses
+        contentPane.setOnKeyPressed(e -> SessionManager.updateLastActivityTime());
+
+        // Track button clicks
+        setupButtonActivityTracking();
+    }
+    private void setupButtonActivityTracking() {
+        // Track all button clicks in the main content area
+        contentPane.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
+            if (e.getTarget() instanceof Button) {
+                SessionManager.updateLastActivityTime();
+            }
+        });
+
+        // Track menu button clicks specifically
+        if (leftMenu != null) {
+            for (javafx.scene.Node node : leftMenu.getChildren()) {
+                if (node instanceof Button) {
+                    node.setOnMouseClicked(e -> SessionManager.updateLastActivityTime());
+                }
+            }
+        }
+    }
 
     private void setupRoleBasedAccess() {
         if (SessionManager.isLoggedIn()) {
@@ -297,6 +552,7 @@ public class AdminDashboardController {
     // Add the showMessages method
     @FXML
     private void showMessages() {
+        SessionManager.updateLastActivityTime();
         try {
             // Ensure messaging is initialized
             if (messagePollingService == null) {
@@ -321,6 +577,7 @@ public class AdminDashboardController {
     }
 
     private void createMessagesUI() {
+        SessionManager.updateLastActivityTime();
         messagesPane = new VBox(10);
         messagesPane.setStyle("-fx-padding: 15; -fx-background-color: white;");
         messagesPane.setPrefSize(800, 600);
@@ -394,6 +651,7 @@ public class AdminDashboardController {
     }
 
     private void showUserSelectionDialog() {
+        SessionManager.updateLastActivityTime();
         try {
             // Get all users from the server
             List<User> allUsers = ApiClient.getUsers();
@@ -469,6 +727,7 @@ public class AdminDashboardController {
     }
 
     private void startNewConversation(User selectedUser) {
+        SessionManager.updateLastActivityTime();
         if (selectedUser != null) {
             // Open chat with the selected user
             openChat(selectedUser.getId(),
@@ -482,6 +741,7 @@ public class AdminDashboardController {
     }
 
     private void showWelcomeMessage(User selectedUser) {
+        SessionManager.updateLastActivityTime();
         String welcomeMessage = "You started a conversation with " +
                 (selectedUser.getFullName() != null && !selectedUser.getFullName().isEmpty()
                         ? selectedUser.getFullName()
@@ -496,6 +756,7 @@ public class AdminDashboardController {
         });
     }
     private void showAlert(String title, String message) {
+        SessionManager.updateLastActivityTime();
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle(title);
@@ -574,6 +835,7 @@ public class AdminDashboardController {
     }
 
     private void openChat(int userId, String userName) {
+        SessionManager.updateLastActivityTime();
         currentChatUserId = userId;
 
         // Update chat header
@@ -652,6 +914,7 @@ public class AdminDashboardController {
     }
 
     private void sendMessage() {
+        SessionManager.updateLastActivityTime();
         String text = messageInput.getText().trim();
         if (!text.isEmpty() && currentChatUserId > 0) {
             boolean success = ApiClient.sendMessage(currentChatUserId, text);
@@ -716,6 +979,7 @@ public class AdminDashboardController {
 
     @FXML
     private void showUserManagement() {
+        SessionManager.updateLastActivityTime();
         if (!SessionManager.isAdmin()) {
             showAccessDeniedAlert();
             return;
@@ -725,11 +989,13 @@ public class AdminDashboardController {
 
     @FXML
     private void showDocumentManagement() {
+        SessionManager.updateLastActivityTime();
         loadPane("document-management-view.fxml");
     }
 
     @FXML
     private void showActivityLogs() {
+        SessionManager.updateLastActivityTime();
         if (!SessionManager.isAdmin()) {
             showAccessDeniedAlert();
             return;
@@ -739,6 +1005,7 @@ public class AdminDashboardController {
 
     @FXML
         private void showSystemControl() {
+        SessionManager.updateLastActivityTime();
         if (!SessionManager.isAdmin()) {
             showAccessDeniedAlert();
             return;
@@ -748,6 +1015,7 @@ public class AdminDashboardController {
 
     @FXML
     private void onBackToDashboard() {
+        SessionManager.updateLastActivityTime();
         try {
             Stage stage = (Stage) contentPane.getScene().getWindow(); // Get current stage
             javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(
@@ -769,6 +1037,7 @@ public class AdminDashboardController {
 
     @FXML
     private void quickUpload() {
+        SessionManager.updateLastActivityTime();
         // Simulate quick upload - you can enhance this with actual file chooser
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Document to Upload");
@@ -789,6 +1058,7 @@ public class AdminDashboardController {
 
     @FXML
     private void refreshDashboard() {
+        SessionManager.updateLastActivityTime();
         loadDashboardData();
         showInfo("Dashboard Refreshed", "Dashboard statistics updated successfully.");
     }
@@ -804,21 +1074,102 @@ public class AdminDashboardController {
         }
     }
 
+//    @FXML
+//    private void logout() {
+//        try {
+//            SessionManager.logout();
+//            ApiClient.logout();
+//
+//            FXMLLoader loader = new FXMLLoader(getClass().getResource("hello-view.fxml"));
+//            Scene scene = new Scene(loader.load(), 800, 600);
+//            Stage stage = (Stage) contentPane.getScene().getWindow();
+//            stage.setScene(scene);
+//            stage.setTitle("Offline Document Hub - Login");
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//    }
+
     @FXML
     private void logout() {
         try {
-            SessionManager.logout();
+            // Clean up countdown dialog
+            cleanupCountdownDialog();
+
+            // Stop monitoring service
+            if (sessionMonitorService != null) {
+                sessionMonitorService.cancel();
+            }
+
+            // Stop message polling
+            if (messagePollingService != null) {
+                messagePollingService.cancel();
+            }
+
+            // Call server logout
             ApiClient.logout();
 
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("hello-view.fxml"));
-            Scene scene = new Scene(loader.load(), 800, 600);
-            Stage stage = (Stage) contentPane.getScene().getWindow();
-            stage.setScene(scene);
-            stage.setTitle("Offline Document Hub - Login");
-        } catch (IOException e) {
-            e.printStackTrace();
+            // Clear local session
+            SessionManager.logout();
+
+            // Navigate to login
+            navigateToLogin();
+        } catch (Exception e) {
+            System.err.println("Error during logout: " + e.getMessage());
+            navigateToLogin();
         }
     }
+
+    private void navigateToLogin() {
+        try {
+            System.out.println("=== CONTROLLER: Navigating to login ===");
+
+            // Get the current stage (dashboard window)
+            Stage currentStage = (Stage) contentPane.getScene().getWindow();
+
+            // Close the current dashboard window
+            currentStage.close();
+            System.out.println("=== CONTROLLER: Dashboard window closed ===");
+
+            // Create and show login window
+            showLoginWindow();
+
+        } catch (Exception e) {
+            System.err.println("Error navigating to login: " + e.getMessage());
+            e.printStackTrace();
+            // Fallback: just close the application
+            Platform.exit();
+        }
+    }
+
+    private void showLoginWindow() {
+        try {
+            System.out.println("=== CONTROLLER: Creating login window ===");
+
+            // Create a new stage for login
+            Stage loginStage = new Stage();
+
+            // Load the login FXML with proper path
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/example/offlinedocumenthub/hello-view.fxml"));
+            Parent root = loader.load();
+
+            Scene scene = new Scene(root);
+            loginStage.setScene(scene);
+            loginStage.setTitle("Offline Document Hub - Login");
+            loginStage.setResizable(false);
+
+            // Show the login window
+            loginStage.show();
+            System.out.println("=== CONTROLLER: Login window shown ===");
+
+        } catch (Exception e) {
+            System.err.println("Error creating login window: " + e.getMessage());
+            e.printStackTrace();
+            // If login window fails, just exit
+            Platform.exit();
+        }
+    }
+
 
     private void showAccessDeniedAlert() {
         javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.WARNING);
