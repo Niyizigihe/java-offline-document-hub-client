@@ -1,145 +1,3 @@
-//package com.example.offlinedocumenthub;
-//
-//import javafx.fxml.FXML;
-//import javafx.fxml.FXMLLoader;
-//import javafx.scene.Node;
-//import javafx.scene.control.Button;
-//import javafx.scene.layout.StackPane;
-//import javafx.scene.layout.VBox;
-//import javafx.scene.Scene;
-//import javafx.stage.Stage;
-//
-//import java.io.IOException;
-//
-//public class AdminDashboardController {
-//
-//    @FXML private StackPane contentPane;
-//    @FXML private VBox leftMenu;
-//    @FXML private Button btnUsers;
-//    @FXML private Button btnDocuments;
-//    @FXML private Button btnActivityLogs;
-//    @FXML private Button btnSystemControl;
-//
-//    @FXML
-//    public void initialize() {
-//        setupRoleBasedAccess();
-//    }
-//
-//    private void setupRoleBasedAccess() {
-//        // Check user role and show/hide buttons accordingly
-//        if (SessionManager.isLoggedIn()) {
-//            String role = SessionManager.getCurrentRole();
-//            String username = SessionManager.getCurrentUsername();
-//
-//            System.out.println("User logged in: " + username + " with role: " + role);
-//
-//            if ("admin".equals(role)) {
-//                // Admin can see all buttons
-//                btnUsers.setVisible(true);
-//                btnUsers.setManaged(true);
-//                btnActivityLogs.setVisible(true);
-//                btnActivityLogs.setManaged(true);
-//                btnSystemControl.setVisible(true);
-//                btnSystemControl.setManaged(true);
-//                btnDocuments.setVisible(true);
-//                btnDocuments.setManaged(true);
-//            } else {
-//                // Student can only see Documents button
-//                btnUsers.setVisible(false);
-//                btnUsers.setManaged(false);
-//                btnActivityLogs.setVisible(false);
-//                btnActivityLogs.setManaged(false);
-//                btnSystemControl.setVisible(false);
-//                btnSystemControl.setManaged(false);
-//                btnDocuments.setVisible(true);
-//                btnDocuments.setManaged(true);
-//
-//                // Also update the button text for students
-//                btnDocuments.setText("Shared Documents");
-//            }
-//        } else {
-//            // If not logged in, hide all buttons (shouldn't happen, but safety check)
-//            btnUsers.setVisible(false);
-//            btnUsers.setManaged(false);
-//            btnActivityLogs.setVisible(false);
-//            btnActivityLogs.setManaged(false);
-//            btnSystemControl.setVisible(false);
-//            btnSystemControl.setManaged(false);
-//            btnDocuments.setVisible(false);
-//            btnDocuments.setManaged(false);
-//        }
-//    }
-//
-//    @FXML
-//    private void showUserManagement() {
-//        if (!SessionManager.isAdmin()) {
-//            showAccessDeniedAlert();
-//            return;
-//        }
-//        loadPane("user-management-view.fxml");
-//    }
-//
-//    @FXML
-//    private void showDocumentManagement() {
-//        loadPane("document-management-view.fxml");
-//    }
-//
-//    @FXML
-//    private void showActivityLogs() {
-//        if (!SessionManager.isAdmin()) {
-//            showAccessDeniedAlert();
-//            return;
-//        }
-//        loadPane("activity-log-view.fxml");
-//    }
-//
-//    @FXML
-//    private void showSystemControl() {
-//        if (!SessionManager.isAdmin()) {
-//            showAccessDeniedAlert();
-//            return;
-//        }
-//        loadPane("system-control-view.fxml");
-//    }
-//
-//    @FXML
-//    private void logout() {
-//        try {
-//            // Clear session
-//            SessionManager.logout();
-//            ApiClient.logout();
-//
-//            // Navigate back to login
-//            FXMLLoader loader = new FXMLLoader(getClass().getResource("hello-view.fxml"));
-//            Scene scene = new Scene(loader.load(), 800, 600);
-//            Stage stage = (Stage) contentPane.getScene().getWindow();
-//            stage.setScene(scene);
-//            stage.setTitle("Offline Document Hub - Login");
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    private void loadPane(String fxmlFile) {
-//        try {
-//            Node pane = FXMLLoader.load(getClass().getResource(fxmlFile));
-//            contentPane.getChildren().clear();
-//            contentPane.getChildren().add(pane);
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//            System.err.println("Failed to load: " + fxmlFile);
-//        }
-//    }
-//
-//    private void showAccessDeniedAlert() {
-//        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.WARNING);
-//        alert.setTitle("Access Denied");
-//        alert.setHeaderText("Insufficient Permissions");
-//        alert.setContentText("You do not have permission to access this feature. Please contact an administrator.");
-//        alert.showAndWait();
-//    }
-//}
-
 package com.example.offlinedocumenthub;
 
 import com.example.offlinedocumenthub.dto.Message;
@@ -150,6 +8,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
@@ -173,6 +32,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -202,6 +62,8 @@ public class AdminDashboardController {
     @FXML private Label lblServerStatus;
     @FXML private Label lblDatabaseStatus;
     @FXML private Label lblLastLogin;
+    @FXML private Button btnNotifications;
+    @FXML private Label notificationBadge;
 
     private MessagePollingService messagePollingService;
     private VBox messagesPane;
@@ -219,6 +81,8 @@ public class AdminDashboardController {
     private Timeline autoCloseTimeline;
     private boolean countdownDialogOpen = false;
 
+    private NotificationPollingService notificationService;
+
     @FXML
     public void initialize() {
         setupRoleBasedAccess();
@@ -226,16 +90,25 @@ public class AdminDashboardController {
         loadDashboardData();
         showWelcomePane();
         setupActivityTracking();
+//        setupButtonHoverEffects();
         lblWelcome.setText("Welcome, " + SessionManager.getCurrentFullName() + " (" + SessionManager.getCurrentRole() + ")");
         lblUserWelcome.setText("Hello " + SessionManager.getCurrentFullName() + "! Welcome to your dashboard.");
         initializeMessaging();
+        if (SessionManager.isAdmin()) {
+            initializeNotificationService();
+        }
         // Stop polling when controller is destroyed
         contentPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene == null && messagePollingService != null) {
-                messagePollingService.cancel();
+            if (newScene == null) {
+                if (messagePollingService != null) {
+                    messagePollingService.cancel();
+                }
+                if (notificationService != null) {
+                    notificationService.stopPolling();
+                }
             }
         });
-//        refreshDashboard();
+
     }
 
     // Add this method to initialize session monitoring
@@ -250,6 +123,12 @@ public class AdminDashboardController {
             sessionMonitorService.start();
             System.out.println("=== CONTROLLER: Session monitoring started ===");
         }
+    }
+
+    private void initializeNotificationService() {
+        notificationService = NotificationPollingService.getInstance();
+        notificationService.startPolling();
+        System.out.println("🔔 Notification service started for admin user");
     }
 
     // Update the session expiration handler
@@ -1074,22 +953,6 @@ public class AdminDashboardController {
         }
     }
 
-//    @FXML
-//    private void logout() {
-//        try {
-//            SessionManager.logout();
-//            ApiClient.logout();
-//
-//            FXMLLoader loader = new FXMLLoader(getClass().getResource("hello-view.fxml"));
-//            Scene scene = new Scene(loader.load(), 800, 600);
-//            Stage stage = (Stage) contentPane.getScene().getWindow();
-//            stage.setScene(scene);
-//            stage.setTitle("Offline Document Hub - Login");
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//    }
-
     @FXML
     private void logout() {
         try {
@@ -1104,6 +967,10 @@ public class AdminDashboardController {
             // Stop message polling
             if (messagePollingService != null) {
                 messagePollingService.cancel();
+            }
+            // Stop notification service
+            if (notificationService != null) {
+                notificationService.stopPolling();
             }
 
             // Call server logout
@@ -1186,4 +1053,89 @@ public class AdminDashboardController {
         alert.setContentText(message);
         alert.showAndWait();
     }
+    private void setupNotificationBadge() {
+        if (SessionManager.isAdmin()) {
+            btnNotifications.setVisible(true);
+            btnNotifications.setManaged(true);
+
+            // Update badge every time we check notifications
+            notificationService = NotificationPollingService.getInstance();
+            // You could modify the service to call a callback when new notifications arrive
+        } else {
+            btnNotifications.setVisible(false);
+            btnNotifications.setManaged(false);
+        }
+    }
+
+    @FXML
+    private void showNotifications() {
+        // Show a dialog with all notifications
+        try {
+            List<Map<String, Object>> notifications = ApiClient.getNotifications();
+
+            Dialog<Void> dialog = new Dialog<>();
+            dialog.setTitle("All Notifications");
+            dialog.setHeaderText("System Notifications");
+
+            VBox content = new VBox(10);
+            content.setPadding(new javafx.geometry.Insets(20));
+
+            if (notifications.isEmpty()) {
+                content.getChildren().add(new Label("No notifications"));
+            } else {
+                for (Map<String, Object> notification : notifications) {
+                    String title = (String) notification.get("title");
+                    String message = (String) notification.get("message");
+                    String time = (String) notification.get("createdAt");
+
+                    VBox notificationItem = new VBox(5);
+                    notificationItem.setStyle("-fx-padding: 10; -fx-border-color: #ddd; -fx-background-color: #f8f9fa;");
+
+                    Label titleLabel = new Label(title);
+                    titleLabel.setStyle("-fx-font-weight: bold;");
+
+                    Label messageLabel = new Label(message);
+                    messageLabel.setStyle("-fx-text-fill: #666; -fx-wrap-text: true;");
+
+                    Label timeLabel = new Label(time != null ? time.substring(0, 19).replace("T", " ") : "");
+                    timeLabel.setStyle("-fx-text-fill: #999; -fx-font-size: 10px;");
+
+                    notificationItem.getChildren().addAll(titleLabel, messageLabel, timeLabel);
+                    content.getChildren().add(notificationItem);
+                }
+            }
+
+            ScrollPane scrollPane = new ScrollPane(content);
+            scrollPane.setPrefSize(400, 300);
+            dialog.getDialogPane().setContent(scrollPane);
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+            dialog.showAndWait();
+
+        } catch (Exception e) {
+            showAlert("Error", "Failed to load notifications: " + e.getMessage());
+        }
+    }
+//    private void setupButtonHoverEffects() {
+//        // Apply to all buttons
+//        btnTriggerBackup.setOnMouseEntered(e -> btnTriggerBackup.getScene().setCursor(Cursor.HAND));
+//        btnTriggerBackup.setOnMouseExited(e -> btnTriggerBackup.getScene().setCursor(Cursor.DEFAULT));
+//
+//        btnHealthCheck.setOnMouseEntered(e -> btnHealthCheck.getScene().setCursor(Cursor.HAND));
+//        btnHealthCheck.setOnMouseExited(e -> btnHealthCheck.getScene().setCursor(Cursor.DEFAULT));
+//
+//        btnClearCache.setOnMouseEntered(e -> btnClearCache.getScene().setCursor(Cursor.HAND));
+//        btnClearCache.setOnMouseExited(e -> btnClearCache.getScene().setCursor(Cursor.DEFAULT));
+//
+//        btnViewBackupHistory.setOnMouseEntered(e -> btnViewBackupHistory.getScene().setCursor(Cursor.HAND));
+//        btnViewBackupHistory.setOnMouseExited(e -> btnViewBackupHistory.getScene().setCursor(Cursor.DEFAULT));
+//
+//        btnRefresh.setOnMouseEntered(e -> btnRefresh.getScene().setCursor(Cursor.HAND));
+//        btnRefresh.setOnMouseExited(e -> btnRefresh.getScene().setCursor(Cursor.DEFAULT));
+//
+//        btnLogout.setOnMouseEntered(e -> btnLogout.getScene().setCursor(Cursor.HAND));
+//        btnLogout.setOnMouseExited(e -> btnLogout.getScene().setCursor(Cursor.DEFAULT));
+//
+//        btnBackToDashboard.setOnMouseEntered(e -> btnBackToDashboard.getScene().setCursor(Cursor.HAND));
+//        btnBackToDashboard.setOnMouseExited(e -> btnBackToDashboard.getScene().setCursor(Cursor.DEFAULT));
+//    }
 }

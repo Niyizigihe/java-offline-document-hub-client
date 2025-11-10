@@ -27,5 +27,6 @@ public class ClientMain extends Application {
         primaryStage.setTitle("Offline Document Hub - Client");
         primaryStage.setScene(new Scene(root, 1000, 650));
         primaryStage.show();
+//        BackupAutomationService.startBackupMonitoring();
     }
 }

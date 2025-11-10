@@ -44,6 +44,10 @@ public class DocumentManagementController {
                     " (" + SessionManager.getCurrentRole() + ")");
         }
 
+        if (SessionManager.isAdmin()) {
+            NotificationPollingService.getInstance().startPolling();
+        }
+
         setupColumns();
         loadDocuments();
 

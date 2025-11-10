@@ -7,9 +7,10 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.example.offlinedocumenthub.SystemController"
+      fx:id="mainContainer"
       spacing="20"
       style="-fx-background-color: #ecf0f1; -fx-padding: 20;"
-      prefWidth="800" prefHeight="600">
+      prefWidth="800" prefHeight="700">
 
     <!-- Header -->
     <Label text="System &amp; Cloud Control Center"
@@ -53,7 +54,7 @@
             <Label text="Database:" GridPane.columnIndex="2" GridPane.rowIndex="1"
                    style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
             <Label fx:id="lblDatabaseStatus" GridPane.columnIndex="3" GridPane.rowIndex="1"
-                   style="-fx-text-fill: #27ae60; -fx-font-weight: bold;" text="Connected"/>
+                   style="-fx-font-weight: bold;"/>
         </GridPane>
     </VBox>
 
@@ -61,22 +62,37 @@
     <VBox spacing="15" style="-fx-background-color: white; -fx-padding: 20; -fx-background-radius: 8;">
         <Label text="Backup &amp; Cloud Operations" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
 
+        <!-- First row of buttons -->
         <HBox spacing="15" alignment="CENTER_LEFT">
-            <Button text="🔄 Trigger Cloud Backup" onAction="#triggerBackup"
+            <Button fx:id="btnTriggerBackup" text="🔄 Trigger Cloud Backup" onAction="#triggerBackup"
                     style="-fx-background-color: #f39c12; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20;"/>
 
-            <Button text="📊 System Health Check" onAction="#onSystemHealthCheck"
+            <Button fx:id="btnViewBackupHistory" text="📋 View Backup History" onAction="#viewBackupHistory"
+                    style="-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20;"/>
+        </HBox>
+
+        <!-- Second row of buttons -->
+        <HBox spacing="15" alignment="CENTER_LEFT">
+            <Button fx:id="btnHealthCheck" text="📊 System Health Check" onAction="#onSystemHealthCheck"
                     style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20;"/>
 
-            <Button text="🧹 Clear System Cache" onAction="#onClearCache"
+            <Button fx:id="btnClearCache" text="🧹 Clear System Cache" onAction="#onClearCache"
                     style="-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 10 20;"/>
         </HBox>
 
-        <!-- Backup Progress -->
-        <VBox fx:id="backupProgressSection" visible="false" spacing="10" style="-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5;">
-            <Label text="Backup in Progress..." style="-fx-font-weight: bold; -fx-text-fill: #f39c12;"/>
-            <ProgressBar fx:id="backupProgressBar" prefWidth="300" progress="0.0"/>
-            <Label fx:id="lblBackupStatus" text="Preparing backup..." style="-fx-text-fill: #7f8c8d; -fx-font-size: 12px;"/>
+        <!-- Backup Progress Section -->
+        <VBox fx:id="backupProgressSection" visible="false" spacing="10"
+              style="-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-border-color: #ddd; -fx-border-radius: 5;">
+            <Label text="Backup in Progress" style="-fx-font-weight: bold; -fx-text-fill: #f39c12; -fx-font-size: 14px;"/>
+            <ProgressBar fx:id="backupProgressBar" prefWidth="400" progress="0.0"
+                         style="-fx-accent: #3498db; -fx-border-color: #bdc3c7;"/>
+            <Label fx:id="lblBackupStatus" text="Preparing backup..."
+                   style="-fx-text-fill: #7f8c8d; -fx-font-size: 12px; -fx-wrap-text: true;"/>
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="🔄 Live progress updates" style="-fx-text-fill: #95a5a6; -fx-font-size: 11px;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label text="Do not close this window" style="-fx-text-fill: #e74c3c; -fx-font-size: 11px; -fx-font-weight: bold;"/>
+            </HBox>
         </VBox>
     </VBox>
 
@@ -94,6 +110,7 @@
                 <RowConstraints prefHeight="30"/>
                 <RowConstraints prefHeight="30"/>
                 <RowConstraints prefHeight="30"/>
+                <RowConstraints prefHeight="30"/>
             </rowConstraints>
 
             <Label text="Shared Documents Folder:" GridPane.columnIndex="0" GridPane.rowIndex="0"
@@ -103,27 +120,31 @@
 
             <Label text="Active Sessions:" GridPane.columnIndex="0" GridPane.rowIndex="1"
                    style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
-            <Label fx:id="lblActiveSessions" text="1" GridPane.columnIndex="1" GridPane.rowIndex="1"
+            <Label fx:id="lblActiveSessions" text="0" GridPane.columnIndex="1" GridPane.rowIndex="1"
                    style="-fx-text-fill: #2c3e50;"/>
 
-            <Button text="View Backup History" onAction="#viewBackupHistory" style="-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-weight: bold;"/>
             <Label text="Last Backup:" GridPane.columnIndex="0" GridPane.rowIndex="2"
                    style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
             <Label fx:id="lblLastBackup" text="Never" GridPane.columnIndex="1" GridPane.rowIndex="2"
                    style="-fx-text-fill: #2c3e50;"/>
+
+            <Label text="Backup Automation:" GridPane.columnIndex="0" GridPane.rowIndex="3"
+                   style="-fx-font-weight: bold; -fx-text-fill: #34495e;"/>
+            <Label text="Active (checks every 2 minutes)" GridPane.columnIndex="1" GridPane.rowIndex="3"
+                   style="-fx-text-fill: #27ae60; -fx-font-weight: bold;"/>
         </GridPane>
     </VBox>
 
     <!-- Action Buttons -->
     <HBox spacing="15" alignment="CENTER_RIGHT">
-        <Button text="🔄 Refresh" onAction="#refreshSystemInfo"
+        <Button fx:id="btnRefresh" text="🔄 Refresh" onAction="#refreshSystemInfo"
                 style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15;"/>
 
-        <Button text="🚪 Logout" onAction="#onLogout"
-                style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15;"/>
-
-        <Button text="⬅ Back to Dashboard" onAction="#onBackToDashboard"
+        <Button fx:id="btnBackToDashboard" text="⬅ Back to Dashboard" onAction="#onBackToDashboard"
                 style="-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15;"/>
+
+        <Button fx:id="btnLogout" text="🚪 Logout" onAction="#onLogout"
+                style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 15;"/>
     </HBox>
 
 </VBox>

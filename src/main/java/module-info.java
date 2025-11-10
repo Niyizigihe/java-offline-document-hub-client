@@ -8,6 +8,7 @@ module com.example.offlinedocumenthub {
     requires java.net.http;
     requires com.fasterxml.jackson.datatype.jsr310;
     requires java.desktop;
+    requires javafx.graphics;
 
 
     opens com.example.offlinedocumenthub to javafx.fxml;

@@ -62,6 +62,10 @@ public class ActivityLogController {
             return;
         }
 
+        if (SessionManager.isAdmin()) {
+            NotificationPollingService.getInstance().startPolling();
+        }
+
         if (!SessionManager.isAdmin()) {
             showAlertAndClose("Unauthorized Access", "Only administrators can access activity logs.");
             return;
